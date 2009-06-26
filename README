@@ -1,3 +1,10 @@
 vim-highlight – Output syntax-highlighted HTML version of input using Vim
 
-USAGE: vim-highlight infile [outfile.html] [title] [colorscheme]
+USAGE: vim-highlight [OPTION]... [INFILE|-] [OUTFILE|-]
+
+Options:
+  -h, --help              Display this help
+  -t, --type=TYPE         Override filetype
+  -T, --title=TITLE       Set the HTML title
+  -c, --colorscheme=NAME  Use the given Vim colorscheme
+

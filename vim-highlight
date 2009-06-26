@@ -20,15 +20,80 @@ set -e
 tempdir="$(mktemp -dt vim-highlight.XXXXXXXXXX)"
 trap 'rm -fr "$tempdir"' 0 1 2 13 15
 
-if [ -z "$1" ]; then
-  >&2 printf "USAGE: %s infile [outfile.html] [title] [colorscheme]\n" "$0"
+usage() {
+  >&2 cat <<E
+vim-highlight – Output syntax-highlighted HTML version of input using Vim
+
+USAGE: $0 [OPTION]... [INFILE|-] [OUTFILE|-]
+
+Options:
+  -h, --help              Display this help
+  -t, --type=TYPE         Override filetype
+  -T, --title=TITLE       Set the HTML title
+  -c, --colorscheme=NAME  Use the given Vim colorscheme
+
+E
+}
+
+infile="$tempdir/input"
+outfile="$tempdir/output"
+errfile="$tempdir/errors"
+cat_infile=false
+cat_outfile=false
+type=
+title=
+colorscheme=
+
+opts="$(getopt -s sh -o ht:T:c: -l help,type:,title:,colorscheme: -- "$@")"
+eval set -- "$opts"
+
+while true; do
+  case "$1" in
+  -h|--help)
+    usage; exit ;;
+  -t|--type)
+    type="$2"; shift 2 ;;
+  -T|--title)
+    title="$2"; shift 2 ;;
+  -c|--colorscheme)
+    colorscheme="$2"; shift 2 ;;
+  --)
+    shift; break ;;
+  *)
+    >&2 printf "The dungeon collapsed\n"; exit 1 ;;
+  esac
+done
+
+if [ $# -eq 0 ]; then
+  cat_infile=true
+elif [ "$1" = "-" ]; then
+  cat_infile=true
+  shift
+else
+  infile="$1"
+  shift
+fi
+
+if [ $# -eq 0 ]; then
+  cat_outfile=true
+elif [ "$1" = "-" ]; then
+  cat_outfile=true
+  shift
+else
+  outfile="$1"
+  shift
+fi
+
+if [ $# -gt 0 ]; then
+  usage
   exit 1
 fi
 
-export infile="$1"
-export outfile="${2:-$infile.html}"
-export title="${3:-$infile}"
-export colorscheme="$4"
+if $cat_infile; then
+  cat >"$infile"
+fi
+
+export infile outfile errfile type title colorscheme
 
 script="$tempdir/script.vim"
 cat >>"$script" <<E
@@ -47,15 +112,36 @@ cat >>"$script" <<E
       execute "colorscheme" fnameescape(\$colorscheme)
     endif
 
+    filetype plugin on
     syntax enable
 
-    execute "edit" fnameescape(\$infile)
+    let s:edit = "edit"
+    if strlen(\$type)
+      let s:edit .= " +".fnameescape("set filetype=".fnameescape(\$type))
+    endif
+
+    if strlen(\$infile)
+      execute s:edit fnameescape(\$infile)
+    else
+      throw "Need infile"
+    endif
 
     let g:html_use_css = 1
     runtime! syntax/2html.vim
-    global/<title>/execute "normal S<title>".HTMLEscape(\$title)."</title>"
 
-    execute "write!" fnameescape(\$outfile)
+    if strlen(\$title)
+      global/<title>/execute "normal S<title>".HTMLEscape(\$title)."</title>"
+    endif
+
+    if strlen(\$outfile)
+      execute "write!" fnameescape(\$outfile)
+    else
+      throw "Need outfile"
+    endif
+
+  catch //
+    let s:str = "Error in ".v:throwpoint.": ".v:exception
+    call writefile([s:str], \$errfile)
 
   finally
     quitall!
@@ -63,6 +149,16 @@ cat >>"$script" <<E
 E
 
 </dev/null >/dev/null 2>&1 \
-  vim -E -f -i NONE -n -s -T builtin_xterm -u NONE -U NONE -X -S "$script"
+  vim -E -f -i NONE -n -s -T builtin_xterm -u NONE -U NONE -X -S "$script" \
+  || true
+
+if [ -e "$errfile" ]; then
+  >&2 cat "$errfile"
+  exit 1
+fi
+
+if $cat_outfile; then
+  cat "$outfile"
+fi
 
 # vim:set et sw=2 sts=2:
