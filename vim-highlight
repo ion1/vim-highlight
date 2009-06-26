@@ -21,13 +21,14 @@ tempdir="$(mktemp -dt vim-highlight.XXXXXXXXXX)"
 trap 'rm -fr "$tempdir"' 0 1 2 13 15
 
 if [ -z "$1" ]; then
-  >&2 printf "USAGE: %s infile [outfile.html] [title]\n" "$0"
+  >&2 printf "USAGE: %s infile [outfile.html] [title] [colorscheme]\n" "$0"
   exit 1
 fi
 
 export infile="$1"
 export outfile="${2:-$infile.html}"
 export title="${3:-$infile}"
+export colorscheme="$4"
 
 script="$tempdir/script.vim"
 cat >>"$script" <<E
@@ -41,6 +42,10 @@ cat >>"$script" <<E
 
       return str
     endfunction
+
+    if strlen(\$colorscheme)
+      execute "colorscheme" fnameescape(\$colorscheme)
+    endif
 
     syntax enable
 
