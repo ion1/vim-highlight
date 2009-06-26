@@ -1,1 +1,3 @@
+vim-highlight – Output syntax-highlighted HTML version of input using Vim
+
 USAGE: vim-highlight infile [outfile.html] [title]
